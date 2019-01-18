@@ -59,28 +59,34 @@ def load_checkpoint(checkpoint):
     return load_model, arch, class_idx
 
 def process_image(image):
-    img_pil = Image.open(image)
-   
-    adjustments = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    ''' Scales, crops, and normalizes a PIL image for a PyTorch model,
+        returns an Numpy array
+    '''
+    img_loader = transforms.Compose([
+        transforms.Resize(256), 
+        transforms.CenterCrop(224), 
+        transforms.ToTensor()])
     
-    img_tensor = adjustments(img_pil)
+    pil_image = Image.open(image)
+    pil_image = img_loader(pil_image).float()
     
-    return img_tensor
+    np_image = np.array(pil_image)    
+    
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    np_image = (np.transpose(np_image, (1, 2, 0)) - mean)/std    
+    np_image = np.transpose(np_image, (2, 0, 1))
+            
+    return np_image
 
 def predict(image, model, top_k, gpu, category_names, arch, class_idx):
     ''' 
     Predict the class (or classes) of an image using a trained deep learning model. Returns top_k classes
     and probabilities. If name json file is passed, it will convert classes to actual names.
     '''
-    image = image.unsqueeze(0).float()
+    image = Variable(torch.FloatTensor(image), requires_grad=True)
+    image = image.unsqueeze(0)
    
-
- 
     image = Variable(image)
     
     if gpu and torch.cuda.is_available():
@@ -121,13 +127,14 @@ def print_predict(classes, probs):
         print('{} : {:.3%}'.format(predictions[i][0], predictions[i][1]))
     pass
 
+
 def main():
     in_args = get_input_args()
-    image_process = process_image(in_args.image)
+    norm_image = process_image(in_args.image)
     model, arch, class_idx = load_checkpoint(in_args.checkpoint)
-    classes, probs = predict(image_process, model, in_args.top_k, in_args.gpu, in_args.category_names, arch, class_idx)
+    classes, probs = predict(norm_image, model, in_args.top_k, in_args.gpu, in_args.category_names, arch, class_idx)
     print_predict(classes, probs)
     pass
 if __name__ == '__main__':
-    main()
-    
+    main()                                    
+                                  
